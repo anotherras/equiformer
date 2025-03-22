@@ -3,6 +3,7 @@ import ase.io.trajectory
 import numpy as np
 import torch
 from torch_geometric.data import Data
+import pandas as pd
 from tqdm import tqdm
 
 from ocpmodels.common.utils import collate
@@ -153,12 +154,32 @@ class AtomsToGraphs:
 
             data.edge_index = edge_index
             data.cell_offsets = cell_offsets
-        if self.r_energy:
-            energy = atoms.get_potential_energy(apply_constraint=False)
-            data.y = energy
-        if self.r_forces:
-            forces = torch.Tensor(atoms.get_forces(apply_constraint=False))
-            data.force = forces
+        
+        if self.r_Tm:
+            Tm = self.get_property(atoms.get_chemical_formula(), 'Tm')
+            data.Tm = Tm
+        if self.r_Tb:
+            Tb = self.get_property(atoms.get_chemical_formula(), 'Tb')
+            data.Tb = Tb
+        if self.r_density:
+            density = self.get_property(atoms.get_chemical_formula(), 'density')
+            data.density = density
+        if self.r_flash_point:
+            flash_point = self.get_property(atoms.get_chemical_formula(), 'flash_point')
+            data.flash_point = flash_point
+        if self.r_NHOC:
+            NHOC = self.get_property(atoms.get_chemical_formula(), 'NHOC')
+            data.NHOC = NHOC
+        if self.r_Isp:
+            Isp = self.get_property(atoms.get_chemical_formula(), 'Isp')
+            data.Isp = Isp
+
+        # if self.r_energy:
+        #     energy = atoms.get_potential_energy(apply_constraint=False)
+        #     data.y = energy
+        # if self.r_forces:
+        #     forces = torch.Tensor(atoms.get_forces(apply_constraint=False))
+        #     data.force = forces
         if self.r_distances and self.r_edges:
             data.distances = edge_distances
         if self.r_fixed:
@@ -174,6 +195,11 @@ class AtomsToGraphs:
             data.pbc = torch.tensor(atoms.pbc)
 
         return data
+
+    def get_property(self,smiles , property_name):
+        raw_data = pd.read_csv('../../../data/1006.csv',index_col=0)
+        property = torch.Tensor(raw_data.loc[smiles , property_name])
+        return property
 
     def convert_all(
         self,
