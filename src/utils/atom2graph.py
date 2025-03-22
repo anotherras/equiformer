@@ -156,22 +156,22 @@ class AtomsToGraphs:
             data.cell_offsets = cell_offsets
         
         if self.r_Tm:
-            Tm = self.get_property(atoms.get_chemical_formula(), 'Tm')
+            Tm = self.get_property(atoms.molecule_name, 'Tm')
             data.Tm = Tm
         if self.r_Tb:
-            Tb = self.get_property(atoms.get_chemical_formula(), 'Tb')
+            Tb = self.get_property(atoms.molecule_name, 'Tb')
             data.Tb = Tb
         if self.r_density:
-            density = self.get_property(atoms.get_chemical_formula(), 'density')
+            density = self.get_property(atoms.molecule_name, 'density')
             data.density = density
         if self.r_flash_point:
-            flash_point = self.get_property(atoms.get_chemical_formula(), 'flash_point')
+            flash_point = self.get_property(atoms.molecule_name, 'flash_point')
             data.flash_point = flash_point
         if self.r_NHOC:
-            NHOC = self.get_property(atoms.get_chemical_formula(), 'NHOC')
+            NHOC = self.get_property(atoms.molecule_name, 'NHOC')
             data.NHOC = NHOC
         if self.r_Isp:
-            Isp = self.get_property(atoms.get_chemical_formula(), 'Isp')
+            Isp = self.get_property(atoms.molecule_name, 'Isp')
             data.Isp = Isp
 
         # if self.r_energy:
@@ -197,8 +197,8 @@ class AtomsToGraphs:
         return data
 
     def get_property(self,smiles , property_name):
-        raw_data = pd.read_csv('../../../data/1006.csv',index_col=0)
-        property = torch.Tensor(raw_data.loc[smiles , property_name])
+        raw_data = pd.read_csv('../data/1006.csv',index_col=0)
+        property = torch.Tensor([raw_data.loc[smiles , property_name]])
         return property
 
     def convert_all(

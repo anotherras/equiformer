@@ -6,22 +6,26 @@ from ase.io import read, write
 import torch
 import lmdb
 import pickle
+import os
+import shutil
 
 
 def main(args):
 
     db_path = Path("../data/mol_lmdb")
-    if not db_path.exists():
-        db_path.mkdir()
+    if db_path.exists():
+        shutil.rmtree(db_path)
+    db_path.mkdir(parents=True, exist_ok=True)
     
     db = lmdb.open(
-        str(db_path),
+        os.path.join(str(db_path),"1.lmdb"),
         map_size=1099511627776 * 2,
         subdir=False,
         meminit=False,
         map_async=True,
     )
 
+    print(args.mol_dir)
     mol_dir = Path(args.mol_dir)
     path_list = [path for path in mol_dir.glob("*.mol")]
 
@@ -41,9 +45,10 @@ def main(args):
         r_edges=args.get_edges,
     )
 
-    for idx , path in tqdm(enumerate(path_list)):
+    for idx , path in tqdm(enumerate(path_list),total=len(path_list)):
         atoms = read(path)
         sid = path.stem.split("_")[-1]
+        atoms.molecule_name = sid
         data_object = a2g.convert(atoms)
 
         data_object.tags = torch.LongTensor(atoms.get_tags())
@@ -103,12 +108,17 @@ def get_parser():
     )
     parser.add_argument(
         "--mol_dir",
-        default="../data/lmdb"
+        default="../data/3d_mol"
+    )
+    parser.add_argument(
+        "--get_edges",
+        default=False
     )
    
     return parser
 
 
 if __name__ == "__main__":
-    args = get_parser()
+    parser = get_parser()
+    args = parser.parse_args()
     main(args)
