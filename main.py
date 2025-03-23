@@ -82,11 +82,32 @@ class Runner(submitit.helpers.Checkpointable):
 
 
 from src.data.data_module import MolDataModule
+import yaml
+from src.model.equiformer_module import EquiformerModule 
 
-def main():
 
-    datamodule = MolDataModule()
-    
+def main(config_path):
+    config = yaml.safe_load(open(config_path, "r"))
+
+    datamodule = MolDataModule(config=config)
+    loader = datamodule.train_dataloader() or datamodule.val_dataloader() or datamodule.test_dataloader()
+
+    bond_feat_dim = config["model_attributes"].get(
+            "num_gaussians", 50
+        )
+    num_targets = 1
+
+    net = model.EquiformerV2_OC20(
+        loader.dataset[0].x.shape[-1]  if loader and hasattr(loader.dataset[0], "x")  and loader.dataset[0].x is not None else None,
+        bond_feat_dim,
+        num_targets,
+        **config["model_attributes"]
+            )
+
+    net_module = EquiformerModule(config=config, net=net)
+
+
+
 
 
 if __name__ == "__main__":
