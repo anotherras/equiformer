@@ -10,6 +10,7 @@ class MolDataModule(LightningDataModule):
     def __init__(self, config, cpu=False):
         super().__init__()
         self.config = config
+        self.cpu = cpu
 
         if torch.cuda.is_available() and not self.cpu:
             self.device = torch.device("cuda")
