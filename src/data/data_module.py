@@ -2,12 +2,12 @@ import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from .lmdb_dataset import LMDBDataset
-from .data_parallel import BalancedBatchSampler,ParallelCollater
+from .lmdb_dataset import LmdbDatasetV2
+from .data_parallel import BalancedBatchSampler, ParallelCollater
 
 
 class MolDataModule(LightningDataModule):
-    def __init__(self, config,cpu=False):
+    def __init__(self, config, cpu=False):
         super().__init__()
         self.config = config
 
@@ -16,33 +16,30 @@ class MolDataModule(LightningDataModule):
 
         self.train_dataloader = self.val_dataloader = self.test_dataloader = None
 
-
     def prepare_data(self):
         pass
 
     def setup(self, stage):
         self.parallel_collater = ParallelCollater(
             0 if self.cpu else 1,
-            self.config["model_attributes"].get("otf_graph", False),
+            self.config["model"].get("otf_graph", False),
         )
         self.train_dataset = LMDBDataset(self.config["dataset"])
         self.train_sampler = self.get_sampler(
-                self.train_dataset,
-                self.config["optim"]["batch_size"],
-                shuffle=True,
-            )
+            self.train_dataset,
+            self.config["optim"]["batch_size"],
+            shuffle=True,
+        )
         self.train_loader = self.get_dataloader(
-                self.train_dataset,
-                self.train_sampler,
-            )
-        
+            self.train_dataset,
+            self.train_sampler,
+        )
+
         if self.config.get("val_dataset", None):
             self.val_dataset = LMDBDataset(self.config["val_dataset"])
             self.val_sampler = self.get_sampler(
                 self.val_dataset,
-                self.config["optim"].get(
-                    "eval_batch_size", self.config["optim"]["batch_size"]
-                ),
+                self.config["optim"].get("eval_batch_size", self.config["optim"]["batch_size"]),
                 shuffle=False,
             )
             self.val_loader = self.get_dataloader(
@@ -54,9 +51,7 @@ class MolDataModule(LightningDataModule):
             self.test_dataset = LMDBDataset(self.config["test_dataset"])
             self.test_sampler = self.get_sampler(
                 self.test_dataset,
-                self.config["optim"].get(
-                    "eval_batch_size", self.config["optim"]["batch_size"]
-                ),
+                self.config["optim"].get("eval_batch_size", self.config["optim"]["batch_size"]),
                 shuffle=False,
             )
             self.test_loader = self.get_dataloader(
@@ -70,10 +65,9 @@ class MolDataModule(LightningDataModule):
     def val_dataloader(self):
         return self.val_dataloader if self.val_dataloader else None
 
-
     def test_dataloader(self):
-        return self.test_dataloader if self.test_dataloader else None   
-    
+        return self.test_dataloader if self.test_dataloader else None
+
     def get_sampler(self, dataset, batch_size, shuffle):
         if "load_balancing" in self.config["optim"]:
             balancing_mode = self.config["optim"]["load_balancing"]
@@ -103,4 +97,3 @@ class MolDataModule(LightningDataModule):
             batch_sampler=sampler,
         )
         return loader
-    
