@@ -5,8 +5,6 @@ import sys
 import time
 from pathlib import Path
 
-import submitit
-
 from src.ocpmodels.common import distutils
 from src.ocpmodels.common.flags import flags
 from src.ocpmodels.common.registry import registry
@@ -20,70 +18,12 @@ from src.ocpmodels.common.utils import (
 
 from src import model
 from src import trainer
-import src.trainer.dist_setup 
-
-
-class Runner(submitit.helpers.Checkpointable):
-    def __init__(self):
-        self.config = None
-
-    def __call__(self, config):
-        setup_logging()
-        self.config = copy.deepcopy(config)
-
-        if args.distributed:
-            #distutils.setup(config)
-            trainer.dist_setup.setup(config)
-
-        try:
-            setup_imports()
-            self.trainer = registry.get_trainer_class(
-                config.get("trainer", "energy")
-            )(
-                task=config["task"],
-                model=config["model"],
-                dataset=config["dataset"],
-                optimizer=config["optim"],
-                identifier=config["identifier"],
-                timestamp_id=config.get("timestamp_id", None),
-                run_dir=config.get("run_dir", "./"),
-                is_debug=config.get("is_debug", False),
-                print_every=config.get("print_every", 10),
-                seed=config.get("seed", 0),
-                logger=config.get("logger", "tensorboard"),
-                local_rank=config["local_rank"],
-                amp=config.get("amp", False),
-                cpu=config.get("cpu", False),
-                slurm=config.get("slurm", {}),
-                noddp=config.get("noddp", False),
-            )
-            # overwrite mode
-            if config.get('compute_stats', False):
-                config['mode'] = 'compute_stats'
-            self.task = registry.get_task_class(config["mode"])(self.config)
-            self.task.setup(self.trainer)
-            start_time = time.time()
-            self.task.run()
-            distutils.synchronize()
-            if distutils.is_master():
-                logging.info(f"Total time taken: {time.time() - start_time}")
-        finally:
-            if args.distributed:
-                distutils.cleanup()
-
-    def checkpoint(self, *args, **kwargs):
-        new_runner = Runner()
-        self.trainer.save(checkpoint_file="checkpoint.pt", training_state=True)
-        self.config["checkpoint"] = self.task.chkpt_path
-        self.config["timestamp_id"] = self.trainer.timestamp_id
-        if self.trainer.logger is not None:
-            self.trainer.logger.mark_preempting()
-        return submitit.helpers.DelayedSubmission(new_runner, self.config)
+import src.trainer.dist_setup
 
 
 from src.data.data_module import MolDataModule
 import yaml
-from src.model.equiformer_module import EquiformerModule 
+from src.model.equiformer_module import EquiformerModule
 
 
 def main(config_path):
@@ -92,29 +32,23 @@ def main(config_path):
     datamodule = MolDataModule(config=config)
     loader = datamodule.train_dataloader() or datamodule.val_dataloader() or datamodule.test_dataloader()
 
-    bond_feat_dim = config["model_attributes"].get(
-            "num_gaussians", 50
-        )
+    bond_feat_dim = config["model_attributes"].get("num_gaussians", 50)
     num_targets = 1
 
     net = model.EquiformerV2_OC20(
-        loader.dataset[0].x.shape[-1]  if loader and hasattr(loader.dataset[0], "x")  and loader.dataset[0].x is not None else None,
+        loader.dataset[0].x.shape[-1] if loader and hasattr(loader.dataset[0], "x") and loader.dataset[0].x is not None else None,
         bond_feat_dim,
         num_targets,
         **config["model_attributes"]
-            )
+    )
 
     net_module = EquiformerModule(config=config, net=net)
-
-
-
 
 
 if __name__ == "__main__":
 
     main()
 
-    
     # setup_logging()
 
     # parser = flags.get_parser()

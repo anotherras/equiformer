@@ -6,13 +6,14 @@ from torch_geometric.data import Data
 import pandas as pd
 from tqdm import tqdm
 
-from ocpmodels.common.utils import collate
+from src.ocpmodels.common.utils import collate
 
 
 try:
     from pymatgen.io.ase import AseAtomsAdaptor
 except Exception:
     pass
+
 
 class AtomsToGraphs:
     """A class to help convert periodic atomic structures to graphs.
@@ -43,14 +44,12 @@ class AtomsToGraphs:
         self,
         max_neigh=200,
         radius=6,
-        
         r_Tm=False,
         r_Tb=False,
         r_density=False,
         r_flash_point=False,
         r_NHOC=False,
         r_Isp=False,
-
         r_distances=False,
         r_edges=True,
         r_fixed=True,
@@ -65,7 +64,7 @@ class AtomsToGraphs:
         self.r_flash_point = r_flash_point
         self.r_NHOC = r_NHOC
         self.r_Isp = r_Isp
-        
+
         self.r_distances = r_distances
         self.r_fixed = r_fixed
         self.r_edges = r_edges
@@ -75,9 +74,7 @@ class AtomsToGraphs:
         """Preforms nearest neighbor search and returns edge index, distances,
         and cell offsets"""
         struct = AseAtomsAdaptor.get_structure(atoms)
-        _c_index, _n_index, _offsets, n_distance = struct.get_neighbor_list(
-            r=self.radius, numerical_tol=0, exclude_self=True
-        )
+        _c_index, _n_index, _offsets, n_distance = struct.get_neighbor_list(r=self.radius, numerical_tol=0, exclude_self=True)
 
         _nonmax_idx = []
         for i in range(len(atoms)):
@@ -148,30 +145,28 @@ class AtomsToGraphs:
         if self.r_edges:
             # run internal functions to get padded indices and distances
             split_idx_dist = self._get_neighbors_pymatgen(atoms)
-            edge_index, edge_distances, cell_offsets = self._reshape_features(
-                *split_idx_dist
-            )
+            edge_index, edge_distances, cell_offsets = self._reshape_features(*split_idx_dist)
 
             data.edge_index = edge_index
             data.cell_offsets = cell_offsets
-        
+
         if self.r_Tm:
-            Tm = self.get_property(atoms.molecule_name, 'Tm')
+            Tm = self.get_property(atoms.molecule_name, "Tm")
             data.Tm = Tm
         if self.r_Tb:
-            Tb = self.get_property(atoms.molecule_name, 'Tb')
+            Tb = self.get_property(atoms.molecule_name, "Tb")
             data.Tb = Tb
         if self.r_density:
-            density = self.get_property(atoms.molecule_name, 'density')
+            density = self.get_property(atoms.molecule_name, "density")
             data.density = density
         if self.r_flash_point:
-            flash_point = self.get_property(atoms.molecule_name, 'flash_point')
+            flash_point = self.get_property(atoms.molecule_name, "flash_point")
             data.flash_point = flash_point
         if self.r_NHOC:
-            NHOC = self.get_property(atoms.molecule_name, 'NHOC')
+            NHOC = self.get_property(atoms.molecule_name, "NHOC")
             data.NHOC = NHOC
         if self.r_Isp:
-            Isp = self.get_property(atoms.molecule_name, 'Isp')
+            Isp = self.get_property(atoms.molecule_name, "Isp")
             data.Isp = Isp
 
         # if self.r_energy:
@@ -196,9 +191,9 @@ class AtomsToGraphs:
 
         return data
 
-    def get_property(self,smiles , property_name):
-        raw_data = pd.read_csv('../data/1006.csv',index_col=0)
-        property = torch.Tensor([raw_data.loc[smiles , property_name]])
+    def get_property(self, smiles, property_name):
+        raw_data = pd.read_csv("../data/1006.csv", index_col=0)
+        property = torch.Tensor([raw_data.loc[smiles, property_name]])
         return property
 
     def convert_all(
@@ -228,9 +223,7 @@ class AtomsToGraphs:
             atoms_iter = atoms_collection
         elif isinstance(atoms_collection, ase.db.sqlite.SQLite3Database):
             atoms_iter = atoms_collection.select()
-        elif isinstance(
-            atoms_collection, ase.io.trajectory.SlicedTrajectory
-        ) or isinstance(atoms_collection, ase.io.trajectory.TrajectoryReader):
+        elif isinstance(atoms_collection, ase.io.trajectory.SlicedTrajectory) or isinstance(atoms_collection, ase.io.trajectory.TrajectoryReader):
             atoms_iter = atoms_collection
         else:
             raise NotImplementedError
