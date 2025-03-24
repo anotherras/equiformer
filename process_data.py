@@ -8,44 +8,39 @@ import lmdb
 import pickle
 import os
 import shutil
+import random
+from sklearn.model_selection import train_test_split
 
 
-def main(args):
-
-    db_path = Path("../data/mol_lmdb")
+def create_db(db_path, path_list):
+    db_path = Path(db_path)
     if db_path.exists():
-        shutil.rmtree(db_path)
+        shutil.remove(db_path)
     db_path.mkdir(parents=True, exist_ok=True)
-    
+
     db = lmdb.open(
-        os.path.join(str(db_path),"1.lmdb"),
+        os.path.join(str(db_path), "mol.lmdb"),
         map_size=1099511627776 * 2,
         subdir=False,
         meminit=False,
         map_async=True,
     )
 
-    print(args.mol_dir)
-    mol_dir = Path(args.mol_dir)
-    path_list = [path for path in mol_dir.glob("*.mol")]
-
     a2g = AtomsToGraphs(
         max_neigh=args.max_neigh,
         radius=args.radius,
-
         r_Tm=args.Tm,
         r_Tb=args.Tb,
         r_density=args.density,
         r_flash_point=args.flash_point,
         r_NHOC=args.NHOC,
         r_Isp=args.Isp,
-
         r_fixed=True,
         r_distances=False,
         r_edges=args.get_edges,
     )
 
-    for idx , path in tqdm(enumerate(path_list),total=len(path_list)):
+    for idx, path in tqdm(enumerate(path_list), total=len(path_list)):
         atoms = read(path)
         sid = path.stem.split("_")[-1]
         atoms.molecule_name = sid
@@ -53,7 +48,7 @@ def main(args):
 
         data_object.tags = torch.LongTensor(atoms.get_tags())
         data_object.sid = sid
-        
+
         txn = db.begin(write=True)
         txn.put(
             f"{idx}".encode("ascii"),
@@ -61,42 +56,31 @@ def main(args):
         )
         txn.commit()
         idx += 1
-        
-        # pbar.update(1)
+
+
+def main(args):
+
+    mol_dir = Path(args.mol_dir)
+    data = [path for path in mol_dir.glob("*.mol")]
+
+    train_data, temp_data = train_test_split(data, train_size=0.8, random_state=42)
+    val_ratio_adjusted = 0.1 / (1 - 0.8)
+    val_data, test_data = train_test_split(temp_data, train_size=val_ratio_adjusted, random_state=42)
+
+    db_list = ["../data/train_lmdb", "../data/val_lmdb", "../data/test_lmdb"]
+    datapath_list = [train_data, val_data, test_data]
+    for db_path, data_path in zip(db_list, datapath_list):
+        create_db(db_path, data_path)
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--Tm",
-        help="An attributes to be predicted",
-        default=True
-    )
-    parser.add_argument(
-        "--Tb",
-        help="An attributes to be predicted",
-        default=True
-    )
-    parser.add_argument(
-        "--density",
-        help="An attributes to be predicted",
-        default=True
-    )
-    parser.add_argument(
-        "--flash_point",
-        help="An attributes to be predicted",
-        default=True
-    )
-    parser.add_argument(
-        "--NHOC",
-        help="An attributes to be predicted",
-        default=True
-    )
-    parser.add_argument(
-        "--Isp",
-        help="An attributes to be predicted",
-        default=True
-    )
+    parser.add_argument("--Tm", help="An attributes to be predicted", default=True)
+    parser.add_argument("--Tb", help="An attributes to be predicted", default=True)
+    parser.add_argument("--density", help="An attributes to be predicted", default=True)
+    parser.add_argument("--flash_point", help="An attributes to be predicted", default=True)
+    parser.add_argument("--NHOC", help="An attributes to be predicted", default=True)
+    parser.add_argument("--Isp", help="An attributes to be predicted", default=True)
 
     parser.add_argument(
         "--max_neigh",
@@ -106,15 +90,9 @@ def get_parser():
         "--radius",
         default=6,
     )
-    parser.add_argument(
-        "--mol_dir",
-        default="../data/3d_mol"
-    )
-    parser.add_argument(
-        "--get_edges",
-        default=False
-    )
-   
+    parser.add_argument("--mol_dir", default="../data/3d_mol")
+    parser.add_argument("--get_edges", default=False)
+
     return parser
 
 
