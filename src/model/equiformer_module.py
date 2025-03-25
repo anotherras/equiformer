@@ -23,8 +23,8 @@ class EquiformerModule(LightningModule):
 
         self.model = OCPDataParallel(
             self.model,
-            output_device=self.device,
-            num_gpus=1 if not self.cpu else 0,
+            output_device="cuda",
+            num_gpus=1,
         )
 
         if self.config.get("dataset", None) is not None and normalizer is None:

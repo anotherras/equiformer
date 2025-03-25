@@ -88,6 +88,7 @@ def main(config):
         enable_progress_bar=True,
         logger=wandb_logger,
         default_root_dir="../data/Log",
+        gradient_clip_val=100,
     )
     trainer.fit(model=net_module, datamodule=datamodule)
 

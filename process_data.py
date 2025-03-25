@@ -12,9 +12,12 @@ import random
 from sklearn.model_selection import train_test_split
 import pandas as pd
 
+from torch_geometric.nn import radius_graph
 
-def create_db(db_path, path_list):
+
+def create_db(db_path, path_list, only_computer=True):
     db_path = Path(db_path)
+
     if db_path.exists():
         shutil.rmtree(db_path)
     db_path.mkdir(parents=True, exist_ok=True)
@@ -95,6 +98,58 @@ def main(args):
         create_db(db_path, data_path)
 
 
+def get_degree_natoms(args, max_radius=5, max_neighbors=100):
+
+    mol_dir = Path(args.mol_dir)
+    data = [path for path in mol_dir.glob("*.mol")]
+
+    train_data, temp_data = train_test_split(data, train_size=0.8, random_state=42)
+
+    a2g = AtomsToGraphs(
+        max_neigh=args.max_neigh,
+        radius=args.radius,
+        r_Tm=args.Tm,
+        r_Tb=args.Tb,
+        r_density=args.density,
+        r_flash_point=args.flash_point,
+        r_NHOC=args.NHOC,
+        r_Isp=args.Isp,
+        r_fixed=True,
+        r_distances=False,
+        r_edges=args.get_edges,
+    )
+
+    all_degree = []
+    all_atoms = []
+
+    for idx, path in tqdm(enumerate(train_data), total=len(train_data), desc="get_degree_natoms"):
+        atoms = read(path)
+        sid = path.stem.split("_")[-1]
+        atoms.molecule_name = sid
+        data_object = a2g.convert(atoms)
+
+        data_object.tags = torch.LongTensor(atoms.get_tags())
+        data_object.sid = sid
+
+        edge_index = radius_graph(
+            data_object.pos,
+            r=max_radius,
+            max_num_neighbors=max_neighbors,
+        )
+        all_degree.append(edge_index.shape[-1])
+        all_atoms.append(data_object.natoms)
+
+    import numpy as np
+    import json
+
+    info = {}
+    info["mean_degree"] = np.sum(all_degree) / np.sum(all_atoms)
+    info["mean_atom"] = np.mean(all_atoms)
+    with open("../data/molecule_stats.json", "w") as f:
+        json.dump(info, f, indent=4)
+    print(np.sum(all_degree) / np.sum(all_atoms), np.mean(all_atoms))
+
+
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--Tm", help="An attributes to be predicted", default=True)
@@ -121,4 +176,5 @@ def get_parser():
 if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
-    main(args)
+    # main(args)
+    get_degree_natoms(args)
