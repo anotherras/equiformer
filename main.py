@@ -7,6 +7,10 @@ from src.utils.config import build_config
 from equiformer_v2.equiformer_v2_oc20 import EquiformerV2_OC20
 
 import lightning as L
+from lightning import Trainer
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.loggers import WandbLogger
+import datetime
 
 
 def get_parser():
@@ -45,7 +49,16 @@ def get_parser():
 
 
 def main(config):
+    current_time = datetime.datetime.now()
+    name = current_time.current_time.strftime("%m%d%H%M%S")
+
     L.seed_everything(config.seed)
+
+    wandb_logger = WandbLogger(
+        project="mol_equiformer",
+        name=f"{name}-now",
+        save_dir="../data/Log",
+    )
 
     datamodule = MolDataModule(config=config)
 
@@ -59,6 +72,21 @@ def main(config):
     net = EquiformerV2_OC20(None, bond_feat_dim, num_targets, **config2["model_attributes"])
 
     net_module = EquiformerModule(config=config, net=net)
+
+    earlystop = EarlyStopping(monitor="val_loss", patience=10, mode="min", verbose=True)
+    trainer = Trainer(
+        min_epochs=10,
+        max_epochs=10000,
+        accelerator="gpu",
+        devices=1,
+        log_every_n_steps=1,
+        check_val_every_n_epoch=1,
+        callbacks=[earlystop],
+        enable_progress_bar=True,
+        logger=wandb_logger,
+        default_root_dir="/data/ljp/Project/Polymer/sol_polygnn/pl/logs",
+    )
+    trainer.fit(model=net_module, datamodule=datamodule)
 
 
 if __name__ == "__main__":
