@@ -49,11 +49,11 @@ def main(config):
 
     L.seed_everything(config["seed"])
 
-    # wandb_logger = WandbLogger(
-    #     project="mol_equiformer",
-    #     name=f"{name}-now",
-    #     save_dir="../data/Log",
-    # )
+    wandb_logger = WandbLogger(
+        project="mol_equiformer",
+        name=f"{name}-now",
+        save_dir="../data/Log",
+    )
 
     model = config["model"]
     config2 = {
@@ -86,7 +86,7 @@ def main(config):
         check_val_every_n_epoch=1,
         callbacks=[earlystop],
         enable_progress_bar=True,
-        # logger=wandb_logger,
+        logger=wandb_logger,
         default_root_dir="../data/Log",
     )
     trainer.fit(model=net_module, datamodule=datamodule)
