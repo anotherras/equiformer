@@ -6,6 +6,8 @@ import argparse
 from src.utils.config import build_config
 from equiformer_v2.equiformer_v2_oc20 import EquiformerV2_OC20
 
+import lightning as L
+
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -34,10 +36,17 @@ def get_parser():
         type=str,
         help="Directory to store checkpoint/log/result directory",
     )
+    parser.add_argument(
+        "--seed",
+        default=42,
+        type=int,
+    )
     return parser
 
 
 def main(config):
+    L.seed_everything(config.seed)
+
     datamodule = MolDataModule(config=config)
 
     model = config["model"]

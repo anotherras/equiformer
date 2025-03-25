@@ -22,7 +22,7 @@ class MolDataModule(LightningDataModule):
     def setup(self, stage):
         self.parallel_collater = ParallelCollater(
             0 if self.cpu else 1,
-            self.config["model"].get("otf_graph", False),
+            self.config["model_attributes"].get("otf_graph", False),
         )
         self.train_dataset = LmdbDatasetV2(self.config["dataset"])
         self.train_sampler = self.get_sampler(
