@@ -10,8 +10,7 @@ class MolDataModule(LightningDataModule):
     def __init__(self, config, cpu=False):
         super().__init__()
         self.config = config
-        self.cpu = cpu
-
+        self
         if torch.cuda.is_available() and not self.cpu:
             self.device = torch.device("cuda")
 
@@ -25,7 +24,7 @@ class MolDataModule(LightningDataModule):
             0 if self.cpu else 1,
             self.config["model"].get("otf_graph", False),
         )
-        self.train_dataset = LMDBDataset(self.config["dataset"])
+        self.train_dataset = LmdbDatasetV2(self.config["dataset"])
         self.train_sampler = self.get_sampler(
             self.train_dataset,
             self.config["optim"]["batch_size"],
@@ -37,7 +36,7 @@ class MolDataModule(LightningDataModule):
         )
 
         if self.config.get("val_dataset", None):
-            self.val_dataset = LMDBDataset(self.config["val_dataset"])
+            self.val_dataset = LmdbDatasetV2(self.config["val_dataset"])
             self.val_sampler = self.get_sampler(
                 self.val_dataset,
                 self.config["optim"].get("eval_batch_size", self.config["optim"]["batch_size"]),
@@ -49,7 +48,7 @@ class MolDataModule(LightningDataModule):
             )
 
         if self.config.get("test_dataset", None):
-            self.test_dataset = LMDBDataset(self.config["test_dataset"])
+            self.test_dataset = LmdbDatasetV2(self.config["test_dataset"])
             self.test_sampler = self.get_sampler(
                 self.test_dataset,
                 self.config["optim"].get("eval_batch_size", self.config["optim"]["batch_size"]),
