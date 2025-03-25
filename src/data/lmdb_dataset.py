@@ -15,13 +15,14 @@ import torch_geometric
 
 from ocpmodels.common import distutils
 from ocpmodels.common.registry import registry
-#from ocpmodels.common.utils import pyg2_data_transform
+
+# from ocpmodels.common.utils import pyg2_data_transform
 
 
 def pyg2_data_transform(data: Data):
     # if we're on the new pyg (2.0 or later), we need to convert the data to the new format
     if torch_geometric.__version__ >= "2.0":
-        if '_store' not in data.__dict__:
+        if "_store" not in data.__dict__:
             return Data(**{k: v for k, v in data.__dict__.items() if v is not None})
 
     return data
@@ -40,11 +41,11 @@ class LmdbDatasetV2(Dataset):
                     (default: :obj:`None`)
     """
 
-    def __init__(self, config, transform=None):
+    def __init__(self, path, transform=None):
         super(LmdbDatasetV2, self).__init__()
-        self.config = config
+        self.path = path
 
-        self.path = Path(self.config["src"])
+        self.path = Path(self.path)
         if not self.path.is_file():
             db_paths = sorted(self.path.glob("*.lmdb"))
             assert len(db_paths) > 0, f"No LMDBs found in '{self.path}'"
@@ -54,9 +55,7 @@ class LmdbDatasetV2(Dataset):
             self._keys, self.envs = [], []
             for db_path in db_paths:
                 self.envs.append(self.connect_db(db_path))
-                length = pickle.loads(
-                    self.envs[-1].begin().get("length".encode("ascii"))
-                )
+                length = pickle.loads(self.envs[-1].begin().get("length".encode("ascii")))
                 self._keys.append(list(range(length)))
 
             keylens = [len(k) for k in self._keys]
@@ -65,10 +64,7 @@ class LmdbDatasetV2(Dataset):
         else:
             self.metadata_path = self.path.parent / "metadata.npz"
             self.env = self.connect_db(self.path)
-            self._keys = [
-                f"{j}".encode("ascii")
-                for j in range(self.env.stat()["entries"])
-            ]
+            self._keys = [f"{j}".encode("ascii") for j in range(self.env.stat()["entries"])]
             self.num_samples = len(self._keys)
 
         self.transform = transform
@@ -87,11 +83,7 @@ class LmdbDatasetV2(Dataset):
             assert el_idx >= 0
 
             # Return features.
-            datapoint_pickled = (
-                self.envs[db_idx]
-                .begin()
-                .get(f"{self._keys[db_idx][el_idx]}".encode("ascii"))
-            )
+            datapoint_pickled = self.envs[db_idx].begin().get(f"{self._keys[db_idx][el_idx]}".encode("ascii"))
             data_object = pyg2_data_transform(pickle.loads(datapoint_pickled))
             data_object.id = f"{db_idx}_{el_idx}"
         else:
@@ -127,8 +119,7 @@ class SinglePointLmdbDatasetV2(LmdbDatasetV2):
     def __init__(self, config, transform=None):
         super(SinglePointLmdbDatasetV2, self).__init__(config, transform)
         warnings.warn(
-            "SinglePointLmdbDataset is deprecated and will be removed in the future."
-            "Please use 'LmdbDataset' instead.",
+            "SinglePointLmdbDataset is deprecated and will be removed in the future." "Please use 'LmdbDataset' instead.",
             stacklevel=3,
         )
 
@@ -137,8 +128,7 @@ class TrajectoryLmdbDatasetV2(LmdbDatasetV2):
     def __init__(self, config, transform=None):
         super(TrajectoryLmdbDatasetV2, self).__init__(config, transform)
         warnings.warn(
-            "TrajectoryLmdbDataset is deprecated and will be removed in the future."
-            "Please use 'LmdbDataset' instead.",
+            "TrajectoryLmdbDataset is deprecated and will be removed in the future." "Please use 'LmdbDataset' instead.",
             stacklevel=3,
         )
 
@@ -154,8 +144,6 @@ def data_list_collater(data_list, otf_graph=False):
                 n_neighbors.append(n_index.shape[0])
             batch.neighbors = torch.tensor(n_neighbors)
         except NotImplementedError:
-            logging.warning(
-                "LMDB does not contain edge index information, set otf_graph=True"
-            )
+            logging.warning("LMDB does not contain edge index information, set otf_graph=True")
 
     return batch

@@ -15,7 +15,7 @@ import datetime
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_yml", default="/data/ljp/Project/Protein/equiformer/equiformer_git/src/config/equiformer.yml")
+    parser.add_argument("--config_yml", default="./src/config/equiformer.yml")
     parser.add_argument(
         "--mode",
         choices=["train", "predict", "run-relaxations", "validate"],
@@ -28,7 +28,7 @@ def get_parser():
         type=str,
         help="Experiment identifier to append to checkpoint/log/result directory",
     )
-    parser.add_argument("--seed", default=0, type=int, help="Seed for torch, cuda, numpy")
+    parser.add_argument("--seed", default=42, type=int, help="Seed for torch, cuda, numpy")
     parser.add_argument(
         "--debug",
         action="store_true",
@@ -40,38 +40,41 @@ def get_parser():
         type=str,
         help="Directory to store checkpoint/log/result directory",
     )
-    parser.add_argument(
-        "--seed",
-        default=42,
-        type=int,
-    )
     return parser
 
 
 def main(config):
     current_time = datetime.datetime.now()
-    name = current_time.current_time.strftime("%m%d%H%M%S")
+    name = current_time.strftime("%m%d%H%M%S")
 
-    L.seed_everything(config.seed)
+    L.seed_everything(config["seed"])
 
-    wandb_logger = WandbLogger(
-        project="mol_equiformer",
-        name=f"{name}-now",
-        save_dir="../data/Log",
-    )
-
-    datamodule = MolDataModule(config=config)
+    # wandb_logger = WandbLogger(
+    #     project="mol_equiformer",
+    #     name=f"{name}-now",
+    #     save_dir="../data/Log",
+    # )
 
     model = config["model"]
-    config2 = {"name": model.pop("name"), "model_attributes": model}
+    config2 = {
+        "name": model.pop("name"),
+        "model_attributes": model,
+        "dataset": config["dataset"],
+        "optim": config["optim"],
+        "target_property": config["target_property"],
+        "normalize_mean": config["normalize_mean"],
+        "normalize_std": config["normalize_std"],
+    }
+
+    datamodule = MolDataModule(config=config2)
 
     bond_feat_dim = config2["model_attributes"].get("num_gaussians", 50)
     bond_feat_dim = 50
     num_targets = 1
 
-    net = EquiformerV2_OC20(None, bond_feat_dim, num_targets, **config2["model_attributes"])
+    equiformer = EquiformerV2_OC20(None, bond_feat_dim, num_targets, **config2["model_attributes"])
 
-    net_module = EquiformerModule(config=config, net=net)
+    net_module = EquiformerModule(config=config2, model=equiformer)
 
     earlystop = EarlyStopping(monitor="val_loss", patience=10, mode="min", verbose=True)
     trainer = Trainer(
@@ -83,8 +86,8 @@ def main(config):
         check_val_every_n_epoch=1,
         callbacks=[earlystop],
         enable_progress_bar=True,
-        logger=wandb_logger,
-        default_root_dir="/data/ljp/Project/Polymer/sol_polygnn/pl/logs",
+        # logger=wandb_logger,
+        default_root_dir="../data/Log",
     )
     trainer.fit(model=net_module, datamodule=datamodule)
 

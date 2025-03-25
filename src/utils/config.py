@@ -27,5 +27,6 @@ def build_config(args):
     # config["distributed_backend"] = args.distributed_backend
     # config["noddp"] = args.no_ddp
     # config["gp_gpus"] = args.gp_gpus
+    config["seed"] = args.seed
 
     return config

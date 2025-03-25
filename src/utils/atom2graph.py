@@ -6,7 +6,7 @@ from torch_geometric.data import Data
 import pandas as pd
 from tqdm import tqdm
 
-from src.ocpmodels.common.utils import collate
+from ocpmodels.common.utils import collate
 
 
 try:

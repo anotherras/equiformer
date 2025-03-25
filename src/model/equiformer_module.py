@@ -7,14 +7,15 @@ import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.functional import mse_loss
 from torcheval.metrics.functional import r2_score, mean_squared_error
+import pandas as pd
 
 
 class EquiformerModule(LightningModule):
-    def __init__(self, config, model, normalizer=True):
+    def __init__(self, config, model, normalizer=None):
         super().__init__()
         self.config = config
         self.model = model
-
+        self.target_porperty = self.config["target_property"]
         self.loss = self.load_loss()
 
         if hasattr(self.model, "no_weight_decay"):
@@ -36,8 +37,7 @@ class EquiformerModule(LightningModule):
 
     def computer_loss(self, out, batch):
 
-        target = batch.y.to(self.device)
-
+        target = torch.cat([getattr(b, self.target_porperty).to(self.device) for b in batch])
         if self.normalizer.get("normalize_labels", False):
             target = self.normalizers["target"].norm(target)
 
@@ -54,12 +54,19 @@ class EquiformerModule(LightningModule):
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, batch_size=len(batch))
         return loss
 
+    def _r2_score(self, out, batch):
+        if len(out) <= 1:
+            return 0
+        target = torch.cat([getattr(b, self.target_porperty).to(self.device) for b in batch])
+        out_denorm = self.normalizers["target"].denorm(out)
+        return r2_score(out_denorm, target)
+
     def validation_step(self, batch, batch_idx):
 
         out = self.forward(batch)
         loss = self.computer_loss(out, batch)
 
-        r2 = r2_score(out, batch.y.to(self.device))
+        r2 = self._r2_score(out, batch)
 
         self.log("val_loss", loss, on_step=False, on_epoch=True, batch_size=len(batch))
         self.log("val_r2", r2, on_step=False, on_epoch=True, batch_size=len(batch))
@@ -70,26 +77,30 @@ class EquiformerModule(LightningModule):
         out = self.forward(batch)
         loss = self.computer_loss(out, batch)
 
-        r2 = r2_score(out, batch.y.to(self.device))
+        r2 = self._r2_score(out, batch)
 
         self.log("test_loss", loss, on_step=False, on_epoch=True, batch_size=len(batch))
         self.log("test_r2", r2, on_step=False, on_epoch=True, batch_size=len(batch))
 
     def load_normalizer(self, normalizer):
+        mean = pd.read_csv(self.config["normalize_mean"], index_col=0).loc[self.target_porperty]
+        std = pd.read_csv(self.config["normalize_std"], index_col=0).loc[self.target_porperty]
+
         normalizers = {}
 
         if normalizer.get("normalize_labels", False):
-            if "target_mean" in normalizer:
-                normalizers["target"] = Normalizer(
-                    mean=self.normalizer["target_mean"],
-                    std=self.normalizer["target_std"],
-                    device=self.device,
-                )
-            else:
-                normalizers["target"] = Normalizer(
-                    tensor=self.train_loader.dataset.data.y[self.train_loader.dataset.__indices__],
-                    device=self.device,
-                )
+            normalizers["target"] = Normalizer(mean=mean, std=std, device="cuda")
+            # if "target_mean" in normalizer:
+            #     normalizers["target"] = Normalizer(
+            #         mean=self.normalizer["target_mean"],
+            #         std=self.normalizer["target_std"],
+            #         device=self.device,
+            #     )
+            # else:
+            #     normalizers["target"] = Normalizer(
+            #         tensor=self.train_loader.dataset.data.y[self.train_loader.dataset.__indices__],
+            #         device=self.device,
+            #     )
         return normalizers
 
     def add_weight_decay(self, model, weight_decay, skip_list=()):
@@ -131,7 +142,7 @@ class EquiformerModule(LightningModule):
             lr=self.config["optim"]["lr_initial"],
             **optimizer_params,
         )
-        self.scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5, min_lr=1e-6, verbose=True)
+        self.scheduler = ReduceLROnPlateau(self.optimizer, mode="min", factor=0.1, patience=5, min_lr=1e-6, verbose=True)
         return {
             "optimizer": self.optimizer,
             "lr_scheduler": {

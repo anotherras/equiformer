@@ -10,12 +10,13 @@ import os
 import shutil
 import random
 from sklearn.model_selection import train_test_split
+import pandas as pd
 
 
 def create_db(db_path, path_list):
     db_path = Path(db_path)
     if db_path.exists():
-        shutil.remove(db_path)
+        shutil.rmtree(db_path)
     db_path.mkdir(parents=True, exist_ok=True)
 
     db = lmdb.open(
@@ -57,6 +58,13 @@ def create_db(db_path, path_list):
         txn.commit()
         idx += 1
 
+    txn = db.begin(write=True)
+    txn.put("length".encode("ascii"), pickle.dumps(idx, protocol=-1))
+    txn.commit()
+
+    db.sync()
+    db.close()
+
 
 def main(args):
 
@@ -69,6 +77,20 @@ def main(args):
 
     db_list = ["../data/train_lmdb", "../data/val_lmdb", "../data/test_lmdb"]
     datapath_list = [train_data, val_data, test_data]
+
+    mean_path = "../data/mean.csv"
+    std_path = "../data/std.csv"
+    if not (os.path.exists(mean_path) and os.path.exists(std_path)):
+        train_mol = [i.stem.split("_")[-1] for i in train_data]
+        raw_data = pd.read_csv("../data/1006.csv", index_col=0).loc[train_mol]
+        mean = raw_data.mean()
+        std = raw_data.std()
+
+        mean.to_csv(mean_path)
+        std.to_csv(std_path)
+    else:
+        pass
+
     for db_path, data_path in zip(db_list, datapath_list):
         create_db(db_path, data_path)
 
