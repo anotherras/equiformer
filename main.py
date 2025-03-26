@@ -8,7 +8,7 @@ from equiformer_v2.equiformer_v2_oc20 import EquiformerV2_OC20
 
 import lightning as L
 from lightning import Trainer
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 import datetime
 
@@ -77,6 +77,7 @@ def main(config):
     net_module = EquiformerModule(config=config2, model=equiformer)
 
     earlystop = EarlyStopping(monitor="val_loss", patience=10, mode="min", verbose=True)
+    lr_monitor = LearningRateMonitor(logging_interval="step")
     trainer = Trainer(
         min_epochs=10,
         max_epochs=10000,
@@ -84,7 +85,7 @@ def main(config):
         devices=1,
         log_every_n_steps=1,
         check_val_every_n_epoch=1,
-        callbacks=[earlystop],
+        callbacks=[earlystop, lr_monitor],
         enable_progress_bar=True,
         logger=wandb_logger,
         default_root_dir="../data/Log",
