@@ -1,18 +1,24 @@
 trainer: forces_v2
 
-target_property:  y #Tm
+# target_property:  y 
+target_property:  Tm
 normalize_mean: /data/ljp/Project/Protein/equiformer/data/mean.csv
 normalize_std: /data/ljp/Project/Protein/equiformer/data/std.csv
 
 dataset:
   # - src: datasets/oc20/s2ef/2M/train/
   # - src: /root/autodl-tmp/temp/fairchem/data/s2ef/200k/train
-  train:  /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train #/data/ljp/Project/Protein/equiformer/data/train_lmdb
   #   grad_target_mean: 0.0
   #   grad_target_std: 2.887317180633545
   # - src: /root/autodl-tmp/temp/fairchem/data/s2ef/200k/train
-  val: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train #/data/ljp/Project/Protein/equiformer/data/val_lmdb
-  test: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train #/data/ljp/Project/Protein/equiformer/data/test_lmdb
+  # train:  /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
+  # val: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
+  # test: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
+
+  train:  /data/ljp/Project/Protein/equiformer/data/train_lmdb
+  val: /data/ljp/Project/Protein/equiformer/data/val_lmdb
+  test: /data/ljp/Project/Protein/equiformer/data/test_lmdb
+
   normalize_labels: True
 
 logger: wandb
@@ -80,12 +86,12 @@ model:
 
 
 optim:
-  batch_size:                   4         # 6
-  eval_batch_size:              4         # 6
+  batch_size:                   32         # 6
+  eval_batch_size:              32         # 6
   grad_accumulation_steps:      1         # gradient accumulation: effective batch size = `grad_accumulation_steps` * `batch_size` * (num of GPUs)
   load_balancing: atoms
   num_workers: 8
-  lr_initial:                   0.0001    # [0.0002, 0.0004], eSCN uses 0.0008 for batch size 96
+  lr_initial:                   0.00002    # [0.0002, 0.0004], eSCN uses 0.0008 for batch size 96
   
   optimizer: AdamW
   optimizer_params:
