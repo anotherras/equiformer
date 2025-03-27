@@ -49,11 +49,12 @@ def main(config):
 
     L.seed_everything(config["seed"])
 
-    wandb_logger = WandbLogger(
-        project="mol_equiformer",
-        name=f"{name}-now",
-        save_dir="../data/Log",
-    )
+    wandb_logger = None
+    # wandb_logger = WandbLogger(
+    #     project="mol_equiformer",
+    #     name=f"{name}-now",
+    #     save_dir="../data/Log",
+    # )
 
     model = config["model"]
     config2 = {

@@ -2,14 +2,16 @@ from lightning import LightningModule
 import torch.optim as optim
 import torch.nn as nn
 from ocpmodels.common.data_parallel import OCPDataParallel
-from trainer.lr_scheduler import LRScheduler
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.functional import mse_loss
 from torcheval.metrics.functional import r2_score, mean_squared_error
+from torchmetrics.functional.regression import mean_absolute_error
 import pandas as pd
+import math
+from torch.optim.lr_scheduler import LambdaLR
 
-from trainer.lr_scheduler import LRScheduler
+# from trainer.lr_scheduler import LRScheduler
 
 
 class EquiformerModule(LightningModule):
@@ -63,15 +65,23 @@ class EquiformerModule(LightningModule):
         out_denorm = self.normalizers["target"].denorm(out)
         return r2_score(out_denorm, target)
 
+    def _mae(self, out, batch):
+        target = torch.cat([getattr(b, self.target_porperty).to(self.device) for b in batch])
+        out_denorm = self.normalizers["target"].denorm(out)
+        return mean_absolute_error(out_denorm, target)
+
     def validation_step(self, batch, batch_idx):
 
         out = self.forward(batch)
         loss = self.computer_loss(out, batch)
 
         r2 = self._r2_score(out, batch)
+        mae = self._mae(out, batch)
 
         self.log("val_loss", loss, on_step=False, on_epoch=True, batch_size=len(batch))
         self.log("val_r2", r2, on_step=False, on_epoch=True, batch_size=len(batch))
+        self.log("val_mae", mae, on_step=False, on_epoch=True, batch_size=len(batch))
+
         # self.log("val_rmse", rmse, on_step=False, on_epoch=True, batch_size=len(batch))
 
     def test_step(self, batch, batch_idx):
@@ -85,8 +95,10 @@ class EquiformerModule(LightningModule):
         self.log("test_r2", r2, on_step=False, on_epoch=True, batch_size=len(batch))
 
     def load_normalizer(self, normalizer):
-        mean = pd.read_csv(self.config["normalize_mean"], index_col=0).loc[self.target_porperty]
-        std = pd.read_csv(self.config["normalize_std"], index_col=0).loc[self.target_porperty]
+        import numpy as np
+
+        mean = pd.read_csv(self.config["normalize_mean"], index_col=0).loc[self.target_porperty].astype(np.float32)
+        std = pd.read_csv(self.config["normalize_std"], index_col=0).loc[self.target_porperty].astype(np.float32)
 
         normalizers = {}
 
@@ -129,7 +141,11 @@ class EquiformerModule(LightningModule):
         return params, name_no_wd
 
     def load_loss(self):
-        return nn.L1Loss()
+        # return nn.L1Loss()
+        return nn.MSELoss()
+
+    def lr_scheduler_step(self, scheduler, metric):
+        scheduler.step()
 
     def configure_optimizers(self):
         optimizer = self.config["optim"].get("optimizer", "AdamW")
@@ -152,33 +168,23 @@ class EquiformerModule(LightningModule):
             "optimizer": self.optimizer,
             "lr_scheduler": {
                 "scheduler": self.scheduler,
-                "monitor": "val_loss",
-                "interval": "epoch",
-                "frequency": 1,
+                # "monitor": "val_loss",
+                "interval": "step",
+                # "frequency": 1,
             },
         }
 
     def load_scheduler(self):
-        def multiply(obj, num):
-            if isinstance(obj, list):
-                for i in range(len(obj)):
-                    obj[i] = obj[i] * num
-            else:
-                obj = obj * num
-            return obj
 
-        n_iter_per_epoch = len(self.trainer.datamodule.train_loader)
-
-        self.config["optim"]["scheduler_params"]["epochs"] = self.trainer.estimated_stepping_batches
-        self.config["optim"]["scheduler_params"]["lr"] = self.config["optim"]["lr_initial"]
+        total_steps = self.trainer.estimated_stepping_batches
 
         scheduler_params = self.config["optim"]["scheduler_params"]
-        for k in scheduler_params.keys():
-            if "epochs" in k:
-                if isinstance(scheduler_params[k], (int, float, list)):
-                    scheduler_params[k] = multiply(scheduler_params[k], n_iter_per_epoch)
-        
-        return LRScheduler(self.optimizer, self.config["optim"]).scheduler
+        scheduler_params["epochs"] = total_steps
+        scheduler_params["warmup_epochs"] = int(scheduler_params["warmup_epochs"] * total_steps)
+
+        fn = CosineLRLambda(scheduler_params)
+
+        return LambdaLR(self.optimizer, fn)
 
 
 class Normalizer(object):
@@ -217,3 +223,22 @@ class Normalizer(object):
     def load_state_dict(self, state_dict):
         self.mean = state_dict["mean"].to(self.mean.device)
         self.std = state_dict["std"].to(self.mean.device)
+
+
+class CosineLRLambda:
+    def __init__(self, scheduler_params):
+        self.warmup_epochs = scheduler_params["warmup_epochs"]
+        self.lr_warmup_factor = scheduler_params["warmup_factor"]
+        self.max_epochs = scheduler_params["epochs"]
+        self.lr_min_factor = scheduler_params["lr_min_factor"]
+
+    def __call__(self, current_step):
+        # `warmup_epochs` is already multiplied with the num of iterations
+        if current_step <= self.warmup_epochs:
+            alpha = current_step / float(self.warmup_epochs)
+            return self.lr_warmup_factor * (1.0 - alpha) + alpha
+        else:
+            if current_step >= self.max_epochs:
+                return self.lr_min_factor
+            lr_scale = self.lr_min_factor + 0.5 * (1 - self.lr_min_factor) * (1 + math.cos(math.pi * (current_step / self.max_epochs)))
+            return lr_scale
