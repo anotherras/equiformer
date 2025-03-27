@@ -86,7 +86,7 @@ def main(config):
         devices=1,
         log_every_n_steps=1,
         check_val_every_n_epoch=1,
-        callbacks=[earlystop, lr_monitor],
+        callbacks=[lr_monitor],
         enable_progress_bar=True,
         logger=wandb_logger,
         default_root_dir="../data/Log",
