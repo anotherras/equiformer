@@ -11,6 +11,7 @@ dataset:
   #   grad_target_mean: 0.0
   #   grad_target_std: 2.887317180633545
   # - src: /root/autodl-tmp/temp/fairchem/data/s2ef/200k/train
+
   # train:  /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
   # val: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
   # test: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
@@ -86,8 +87,8 @@ model:
 
 
 optim:
-  batch_size:                   32         # 6
-  eval_batch_size:              32         # 6
+  batch_size:                   2         # 6
+  eval_batch_size:              2         # 6
   grad_accumulation_steps:      1         # gradient accumulation: effective batch size = `grad_accumulation_steps` * `batch_size` * (num of GPUs)
   load_balancing: atoms
   num_workers: 8
