@@ -2,8 +2,8 @@ trainer: forces_v2
 
 # target_property:  y 
 target_property:  Tm
-normalize_mean: /data/ljp/Project/Protein/equiformer/data/mean.csv
-normalize_std: /data/ljp/Project/Protein/equiformer/data/std.csv
+normalize_mean: ../data/mean.csv
+normalize_std: ../data/std.csv
 
 dataset:
   # - src: datasets/oc20/s2ef/2M/train/
@@ -16,9 +16,9 @@ dataset:
   # val: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
   # test: /data/ljp/Project/Protein/equiformer/fairchem/data/s2ef/200k/train 
 
-  train:  /data/ljp/Project/Protein/equiformer/data/train_lmdb
-  val: /data/ljp/Project/Protein/equiformer/data/val_lmdb
-  test: /data/ljp/Project/Protein/equiformer/data/test_lmdb
+  train:  ../data/train_lmdb
+  val: ../data/val_lmdb
+  test: ../data/test_lmdb
 
   normalize_labels: True
 

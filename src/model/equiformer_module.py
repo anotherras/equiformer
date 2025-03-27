@@ -8,7 +8,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn.functional import mse_loss
 from torcheval.metrics.functional import r2_score, mean_squared_error
 import pandas as pd
-from ocpmodels.modules.scheduler import LRScheduler
+
+from trainer.lr_scheduler import LRScheduler
 
 
 class EquiformerModule(LightningModule):
@@ -146,7 +147,7 @@ class EquiformerModule(LightningModule):
         # if ues ReduceLROnPlateau
         # self.scheduler = ReduceLROnPlateau(self.optimizer, mode="min", factor=0.1, patience=5, min_lr=1e-6, verbose=True)
         # if use cos LRScheduler like paper
-        self.scheduler = self.load_scheduler(self.config)
+        self.scheduler = self.load_scheduler()
         return {
             "optimizer": self.optimizer,
             "lr_scheduler": {
@@ -157,7 +158,7 @@ class EquiformerModule(LightningModule):
             },
         }
 
-    def load_scheduler(self, config):
+    def load_scheduler(self):
         def multiply(obj, num):
             if isinstance(obj, list):
                 for i in range(len(obj)):
@@ -166,7 +167,7 @@ class EquiformerModule(LightningModule):
                 obj = obj * num
             return obj
 
-        n_iter_per_epoch = len(self.trainer.train_dataloader)
+        n_iter_per_epoch = len(self.trainer.datamodule.train_loader)
 
         self.config["optim"]["scheduler_params"]["epochs"] = self.trainer.estimated_stepping_batches
         self.config["optim"]["scheduler_params"]["lr"] = self.config["optim"]["lr_initial"]
@@ -176,8 +177,8 @@ class EquiformerModule(LightningModule):
             if "epochs" in k:
                 if isinstance(scheduler_params[k], (int, float, list)):
                     scheduler_params[k] = multiply(scheduler_params[k], n_iter_per_epoch)
-
-        return LRScheduler(self.optimizer, self.config["optim"])
+        
+        return LRScheduler(self.optimizer, self.config["optim"]).scheduler
 
 
 class Normalizer(object):

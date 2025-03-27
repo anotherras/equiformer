@@ -80,7 +80,7 @@ def main(config):
     lr_monitor = LearningRateMonitor(logging_interval="step")
     trainer = Trainer(
         min_epochs=10,
-        max_epochs=10000,
+        max_epochs=100,
         accelerator="gpu",
         devices=1,
         log_every_n_steps=1,
