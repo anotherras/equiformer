@@ -10,6 +10,7 @@ from torchmetrics.functional.regression import mean_absolute_error
 import pandas as pd
 import math
 from torch.optim.lr_scheduler import LambdaLR
+import numpy as np
 
 # from trainer.lr_scheduler import LRScheduler
 
@@ -19,7 +20,7 @@ class EquiformerModule(LightningModule):
         super().__init__()
         self.config = config
         self.model = model
-        self.target_porperty = self.config["target_property"]
+        self.target_property = self.config["target_property"]
         self.loss = self.load_loss()
 
         if hasattr(self.model, "no_weight_decay"):
@@ -41,7 +42,7 @@ class EquiformerModule(LightningModule):
 
     def computer_loss(self, out, batch):
 
-        target = torch.cat([getattr(b, self.target_porperty).to(self.device) for b in batch])
+        target = torch.cat([getattr(b, self.target_property).to(self.device) for b in batch])
         if self.normalizer.get("normalize_labels", False):
             target = self.normalizers["target"].norm(target)
 
@@ -61,12 +62,12 @@ class EquiformerModule(LightningModule):
     def _r2_score(self, out, batch):
         if len(out) <= 1:
             return 0
-        target = torch.cat([getattr(b, self.target_porperty).to(self.device) for b in batch])
+        target = torch.cat([getattr(b, self.target_property).to(self.device) for b in batch])
         out_denorm = self.normalizers["target"].denorm(out)
         return r2_score(out_denorm, target)
 
     def _mae(self, out, batch):
-        target = torch.cat([getattr(b, self.target_porperty).to(self.device) for b in batch])
+        target = torch.cat([getattr(b, self.target_property).to(self.device) for b in batch])
         out_denorm = self.normalizers["target"].denorm(out)
         return mean_absolute_error(out_denorm, target)
 
@@ -84,21 +85,11 @@ class EquiformerModule(LightningModule):
 
         # self.log("val_rmse", rmse, on_step=False, on_epoch=True, batch_size=len(batch))
 
-    def test_step(self, batch, batch_idx):
-
-        out = self.forward(batch)
-        loss = self.computer_loss(out, batch)
-
-        r2 = self._r2_score(out, batch)
-
-        self.log("test_loss", loss, on_step=False, on_epoch=True, batch_size=len(batch))
-        self.log("test_r2", r2, on_step=False, on_epoch=True, batch_size=len(batch))
-
     def load_normalizer(self, normalizer):
         import numpy as np
 
-        mean = pd.read_csv(self.config["normalize_mean"], index_col=0).loc[self.target_porperty].astype(np.float32)
-        std = pd.read_csv(self.config["normalize_std"], index_col=0).loc[self.target_porperty].astype(np.float32)
+        mean = pd.read_csv(self.config["normalize_mean"], index_col=0).loc[self.target_property].astype(np.float32)
+        std = pd.read_csv(self.config["normalize_std"], index_col=0).loc[self.target_property].astype(np.float32)
 
         normalizers = {}
 
@@ -185,6 +176,38 @@ class EquiformerModule(LightningModule):
         fn = CosineLRLambda(scheduler_params)
 
         return LambdaLR(self.optimizer, fn)
+
+    def test_step(self, batch, batch_idx):
+
+        out = self.forward(batch)
+
+        target = torch.cat([getattr(b, self.target_property).to(self.device) for b in batch])
+        if self.normalizer.get("normalize_labels", False):
+            target = self.normalizers["target"].norm(target)
+
+        r2 = self._r2_score(out, batch)
+        self.log("test_r2", r2, on_step=False, on_epoch=True, batch_size=len(batch))
+
+        mae = self._mae(out, batch)
+        self.log("test_mae", mae, on_step=False, on_epoch=True, batch_size=len(batch))
+
+        self.test_predict.append(out.detach().cpu().numpy())
+        self.test_target.append(target.detach().cpu().numpy())
+
+    def on_test_end(self):
+
+        test_predict = np.concatenate(self.test_predict, axis=0)
+        test_target = np.concatenate(self.test_target, axis=0)
+
+        test_r2 = self._r2_score(torch.tensor(test_predict), torch.tensor(test_target))
+        test_mae = self._mae(torch.tensor(test_predict), torch.tensor(test_target))
+
+        self.log("final_test_r2", test_r2)
+        self.log("final_test_mae", test_mae)
+
+    def on_test_start(self):
+        self.test_predict = []
+        self.test_target = []
 
 
 class Normalizer(object):

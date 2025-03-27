@@ -94,6 +94,9 @@ def main(config):
     )
     trainer.fit(model=net_module, datamodule=datamodule)
 
+    if config2["dataset"].get("test", None):
+        trainer.test(model=net_module, datamodule=datamodule, ckpt_path="best")
+
 
 if __name__ == "__main__":
     parser = get_parser()
